@@ -1,0 +1,12 @@
+{
+  "name": "tactical-arena-server",
+  "version": "1.0.0",
+  "description": "Servidor autoritativo para Tactical Arena",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.16.0"
+  }
+}

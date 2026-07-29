@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tactical Arena — Online</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:#0f0f23;color:#e0e0e0;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:12px}
+#menu{display:flex;flex-direction:column;align-items:center;gap:16px;padding:40px}
+#menu h1{font-size:28px;color:#60a5fa;margin-bottom:8px}
+#menu p{color:#8892b0;font-size:14px}
+#menu input{padding:10px 16px;border:1px solid #3a3a5a;background:#1a1a2e;color:#e0e0e0;border-radius:8px;font-size:14px;width:200px;text-align:center}
+#menu button{padding:10px 24px;border:none;background:#3b82f6;color:#fff;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;transition:background .15s}
+#menu button:hover{background:#2563eb}
+#menu .code-box{background:#1a1a2e;border:1px solid #3a3a5a;border-radius:8px;padding:12px 24px;font-size:24px;letter-spacing:4px;color:#fbbf24;font-weight:bold}
+#waiting{display:none;text-align:center;padding:40px}
+#waiting p{color:#8892b0;margin-top:12px}
+#game{display:none;position:relative;background:#16213e;border-radius:12px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+#canvas{display:block;cursor:crosshair;background:#0f3460}
+#ui{display:flex;gap:5px;padding:6px;flex-wrap:wrap;align-items:center;background:#1a1a2e;border-top:1px solid #2a2a4a}
+#ui button{padding:5px 10px;border:1px solid #3a3a5a;background:#16213e;color:#e0e0e0;border-radius:8px;font-size:11px;font-weight:500;cursor:pointer;transition:background .15s}
+#ui button:hover{background:#1f2f5a}
+#ui button:disabled{opacity:.35;cursor:not-allowed}
+#ui .stat{padding:3px 7px;border-radius:6px;background:rgba(255,255,255,.06);font-size:11px;color:#a0a0c0}
+#ui .stat b{color:#e0e0e0}
+#ui .mode{padding:3px 8px;border-radius:6px;font-size:11px;font-weight:500}
+#perks{display:none;position:absolute;top:8px;right:8px;width:190px;background:#1a1a2e;border:1px solid #3a3a5a;border-radius:10px;padding:10px;z-index:10;max-height:320px;overflow-y:auto}
+#perks h3{font-size:13px;margin-bottom:6px;color:#e0e0e0}
+.perk-item{display:flex;align-items:center;gap:6px;padding:4px 0;font-size:11px;color:#a0a0c0;border-bottom:1px solid #2a2a4a}
+.perk-item:last-child{border-bottom:none}
+.perk-item.active{color:#4ade80;font-weight:500}
+.perk-btn{padding:2px 6px;font-size:10px;border-radius:4px;border:1px solid #3a3a5a;background:#16213e;color:#e0e0e0;cursor:pointer}
+.perk-btn:disabled{opacity:.4;cursor:not-allowed}
+#stats{display:none;position:absolute;top:8px;left:8px;width:170px;background:#1a1a2e;border:1px solid #3a3a5a;border-radius:10px;padding:10px;z-index:10}
+#stats h3{font-size:13px;margin-bottom:6px;color:#e0e0e0}
+.stat-row{display:flex;justify-content:space-between;padding:3px 0;font-size:11px;color:#a0a0c0;border-bottom:1px solid #2a2a4a}
+.stat-row:last-child{border-bottom:none}
+.stat-row b{color:#e0e0e0}
+#log{max-height:110px;overflow-y:auto;padding:5px 8px;font-size:11px;color:#a0a0c0;border-top:1px solid #2a2a4a;background:#1a1a2e}
+#log .turn{color:#60a5fa;font-weight:500}
+#log .hit{color:#f87171}
+#log .move{color:#4ade80}
+#log .aoe{color:#fbbf24}
+#log .xp{color:#c084fc;font-weight:500}
+#status{position:fixed;top:8px;left:50%;transform:translateX(-50%);padding:6px 16px;background:#1a1a2e;border:1px solid #3a3a5a;border-radius:20px;font-size:12px;color:#a0a0c0;z-index:30}
+#status.connected{color:#4ade80;border-color:#4ade80}
+#status.error{color:#f87171;border-color:#f87171}
+</style>
+</head>
+<body>
+<div id="status">Desconectado</div>
+
+<div id="menu">
+  <h1>Tactical Arena</h1>
+  <p>Combate tático por turnos — 2 jogadores online</p>
+  <button id="btnCreate">Criar Sala</button>
+  <p>— ou —</p>
+  <input id="inputCode" type="text" placeholder="Código da sala" maxlength="4">
+  <button id="btnJoin">Entrar na Sala</button>
+</div>
+
+<div id="waiting">
+  <div class="code-box" id="waitCode">----</div>
+  <p>Aguardando oponente...</p>
+  <p style="font-size:12px;color:#555">Compartilhe este código com seu amigo</p>
+</div>
+
+<div id="game">
+  <canvas id="canvas" width="640" height="480"></canvas>
+  <div id="stats">
+    <h3 id="statsName">Unidade</h3>
+    <div class="stat-row"><span>HP</span><b id="sHp">-</b></div>
+    <div class="stat-row"><span>AP</span><b id="sAp">-</b></div>
+    <div class="stat-row"><span>Nível</span><b id="sLv">-</b></div>
+    <div class="stat-row"><span>XP</span><b id="sXp">-</b></div>
+    <div class="stat-row"><span>Arma</span><b id="sWpn">-</b></div>
+    <div class="stat-row"><span>Munição</span><b id="sAmmo">-</b></div>
+    <div class="stat-row"><span>Precisão</span><b id="sAim">-</b></div>
+    <div class="stat-row"><span>Movimento</span><b id="sMove">-</b></div>
+    <div class="stat-row"><span>Perks</span><b id="sPerks">-</b></div>
+  </div>
+  <div id="perks">
+    <h3>Perks <span id="xpDisplay">0 XP</span></h3>
+    <div id="perkList"></div>
+  </div>
+  <div id="ui">
+    <button id="btnEndTurn">Passar vez (Enter)</button>
+    <button id="btnOverwatch">Overwatch (O)</button>
+    <button id="btnGrenade">Granada (G)</button>
+    <button id="btnReload">Recarregar (L)</button>
+    <button id="btnPerks">Perks (P)</button>
+    <span class="stat">Turno: <b id="turnNum">1</b></span>
+    <span class="stat">Vez de: <b id="activePlayer">-</b></span>
+    <span class="stat">AP: <b id="apDisplay">-</b></span>
+    <span class="stat" id="ammoStat">Munição: -</span>
+    <span class="mode" id="modeDisplay"></span>
+  </div>
+  <div id="log"></div>
+</div>
+
+<script>
+// === NETWORK ===
+const WS_URL = window.location.protocol==='https:' ? 'wss://'+window.location.host : 'ws://'+window.location.host;
+let ws = null;
+let myTeam = null;
+let gameState = null;
+let selectedUnit = null;
+let hoverCell = null;
+let mode = 'normal';
+let animating = false;
+let shakeX=0, shakeY=0;
+let projectiles=[], particles=[], floatTexts=[];
+
+function setStatus(text, cls){
+  const s=document.getElementById('status');
+  s.textContent=text; s.className=cls||'';
+}
+
+function connect(){
+  ws = new WebSocket(WS_URL);
+  ws.onopen = ()=>setStatus('Conectado','connected');
+  ws.onclose = ()=>{setStatus('Desconectado','error'); setTimeout(connect,2000);};
+  ws.onerror = ()=>setStatus('Erro de conexão','error');
+  ws.onmessage = (e)=>{
+    const msg = JSON.parse(e.data);
+    if(msg.type==='created'){document.getElementById('waitCode').textContent=msg.code; showScreen('waiting');}
+    else if(msg.type==='joined'){showScreen('waiting'); document.querySelector('#waiting p').textContent='Entrando na sala...';}
+    else if(msg.type==='assigned'){myTeam=msg.team;}
+    else if(msg.type==='start'){showScreen('game'); log('Batalha iniciada!');}
+    else if(msg.type==='state'){gameState=msg.state; updateUI();}
+    else if(msg.type==='event'){handleEvent(msg);}
+    else if(msg.type==='winner'){log(msg.winner===myTeam?'VOCÊ VENCEU!':'VOCÊ PERDEU!','hit'); setTimeout(()=>alert(msg.winner===myTeam?'Vitória!':'Derrota!'),300);}
+    else if(msg.type==='disconnected'){log('Oponente desconectou.','hit');}
+    else if(msg.type==='error'){alert(msg.msg);}
+  };
+}
+
+function send(msg){if(ws&&ws.readyState===1)ws.send(JSON.stringify(msg));}
+function showScreen(id){['menu','waiting','game'].forEach(s=>document.getElementById(s).style.display=s===id?'block':'none');}
+
+function handleEvent(msg){
+  const ev = msg.event;
+  if(ev==='move'){
+    const u = findUnit(msg.unit);
+    if(u){ spawnMoveAnim(u, msg.x, msg.y); }
+    if(msg.overwatch){
+      const ow = msg.overwatch;
+      log(`Overwatch! ${teamName(findUnit(ow.attacker).team)} atira!`,'hit');
+      if(ow.hit){
+        spawnFloatText(findUnit(ow.target).x*32+16, findUnit(ow.target).y*32-10, `-${ow.damage}`, '#f87171');
+        spawnParticles(findUnit(ow.target).x*32+16, findUnit(ow.target).y*32+16, '#f87171', 12);
+        if(ow.targetDead) log(`${teamName(findUnit(ow.target).team)} eliminado!`,'hit');
+      } else { spawnFloatText(findUnit(ow.target).x*32+16, findUnit(ow.target).y*32-10, 'ERROU', '#9ca3af'); }
+    }
+  }
+  else if(ev==='attack'){
+    const a=findUnit(msg.attacker), t=findUnit(msg.target);
+    if(a&&t) spawnProjectileAnim(a.x,a.y,t.x,t.y);
+    setTimeout(()=>{
+      if(msg.hit){
+        spawnFloatText(t.x*32+16,t.y*32-10,`-${msg.damage}`,'#f87171');
+        spawnParticles(t.x*32+16,t.y*32+16,'#f87171',14);
+        shakeX=(Math.random()-.5)*10; shakeY=(Math.random()-.5)*10;
+        log(`${teamName(a.team)} acertou ${teamName(t.team)} (-${msg.damage})`,'hit');
+        if(msg.targetDead) log(`${teamName(t.team)} eliminado!`,'hit');
+      } else {
+        spawnFloatText(t.x*32+16,t.y*32-10,'ERROU','#9ca3af');
+        log(`${teamName(a.team)} errou!`,'hit');
+      }
+    },220);
+  }
+  else if(ev==='grenade'){
+    const cx=msg.center.x*32+16, cy=msg.center.y*32+16;
+    spawnProjectileAnim(findUnit(msg.unitId)?.x||0, findUnit(msg.unitId)?.y||0, msg.center.x, msg.center.y);
+    setTimeout(()=>{
+      spawnExplosion(cx,cy,'#fbbf24');
+      spawnFloatText(cx,cy-15,'BOOM!','#fbbf24');
+      log(`Granada (${msg.center.x},${msg.center.y})`,'aoe');
+      msg.hits.forEach(h=>{
+        const t=findUnit(h.target); if(!t) return;
+        spawnFloatText(t.x*32+16,t.y*32-10,`-${h.damage}`,'#fbbf24');
+        spawnParticles(t.x*32+16,t.y*32+16,'#fbbf24',8);
+        log(`${teamName(t.team)} atingido (-${h.damage})`,'aoe');
+        if(h.dead) log(`${teamName(t.team)} morto na explosão!`,'aoe');
+      });
+      shakeX=(Math.random()-.5)*14; shakeY=(Math.random()-.5)*14;
+    },280);
+  }
+  else if(ev==='reload'){ log(`${teamName(findUnit(msg.unit)?.team)} recarregou`,'move'); }
+  else if(ev==='overwatch'){ log(`${teamName(findUnit(msg.unit)?.team)} entrou em Overwatch!`,'move'); }
+  else if(ev==='endTurn'){ log(`Turno ${msg.turn} — ${teamName(msg.activeTeam)}`,'turn'); selectedUnit=null; mode='normal'; }
+}
+
+function teamName(t){return t===0?'Azul':'Vermelho';}
+function findUnit(id){return gameState?.units?.find(u=>u.id===id);}
+
+// === ANIMATIONS ===
+function spawnProjectileAnim(ax,ay,bx,by){projectiles.push({x:ax*32+16,y:ay*32+16,tx:bx*32+16,ty:by*32+16,speed:14});}
+function spawnExplosion(x,y,color){for(let i=0;i<30;i++){const a=Math.random()*Math.PI*2,s=1+Math.random()*5;particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1.2,color});}}
+function spawnParticles(x,y,color,count){for(let i=0;i<count;i++){const a=Math.random()*Math.PI*2,s=1+Math.random()*3;particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,color});}}
+function spawnFloatText(x,y,text,color){floatTexts.push({x,y,text,color,life:1,vy:-1.2});}
+function spawnMoveAnim(u,tx,ty){
+  const sx=u.x*32+16,sy=u.y*32+16,ex=tx*32+16,ey=ty*32+16;
+  let p=0;
+  function step(){
+    p+=.12; if(p>1)p=1;
+    u._vx=sx+(ex-sx)*p; u._vy=sy+(ey-sy)*p;
+    if(p>=1){u._vx=null; u._vy=null;}
+    if(p<1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+// === UI ===
+function log(m,c){const d=document.getElementById('log'),p=document.createElement('div');p.className=c||'';p.textContent=gameState?`[T${gameState.turn}] ${m}`:m;d.appendChild(p);d.scrollTop=d.scrollHeight;}
+function updateUI(){
+  if(!gameState) return;
+  document.getElementById('turnNum').textContent=gameState.turn;
+  const isMyTurn = gameState.activeTeam===myTeam;
+  document.getElementById('activePlayer').textContent=isMyTurn?'Sua vez!':'Vez do oponente';
+  document.getElementById('activePlayer').style.color=isMyTurn?'#4ade80':'#f87171';
+  const md=document.getElementById('modeDisplay');
+  if(mode==='grenade'){md.textContent='MODO: GRANADA'; md.style.background='rgba(251,191,36,0.2)'; md.style.color='#fbbf24';}
+  else if(mode==='overwatch'){md.textContent='MODO: OVERWATCH'; md.style.background='rgba(96,165,250,0.2)'; md.style.color='#60a5fa';}
+  else{md.textContent=''; md.style.background='transparent';}
+
+  if(selectedUnit){
+    const u = findUnit(selectedUnit);
+    if(u&&!u.dead){
+      document.getElementById('apDisplay').textContent=u.ap;
+      document.getElementById('ammoStat').textContent=`${u.weapon.name}: ${u.weapon.ammo}/${u.weapon.maxAmmo}`;
+      renderStats(u); renderPerks(u);
+    } else {selectedUnit=null;}
+  } else {
+    document.getElementById('apDisplay').textContent='-';
+    document.getElementById('ammoStat').textContent='Selecione uma unidade';
+    document.getElementById('stats').style.display='none';
+  }
+  const canAct = isMyTurn && !animating;
+  document.getElementById('btnEndTurn').disabled = !canAct;
+  document.getElementById('btnOverwatch').disabled = !canAct || !selectedUnit || (findUnit(selectedUnit)?.team!==myTeam) || (findUnit(selectedUnit)?.ap<3) || (findUnit(selectedUnit)?.overwatch);
+  document.getElementById('btnGrenade').disabled = !canAct || !selectedUnit || (findUnit(selectedUnit)?.team!==myTeam) || (findUnit(selectedUnit)?.ap<4);
+  document.getElementById('btnReload').disabled = !canAct || !selectedUnit || (findUnit(selectedUnit)?.team!==myTeam) || (findUnit(selectedUnit)?.ap<(findUnit(selectedUnit)?.reloadCost||2)) || (findUnit(selectedUnit)?.weapon?.ammo>=findUnit(selectedUnit)?.weapon?.maxAmmo);
+}
+function renderStats(u){
+  const s=document.getElementById('stats'); s.style.display='block';
+  document.getElementById('statsName').textContent=`${u.team===0?'Azul':'Vermelho'} — ${u.weapon.name}`;
+  document.getElementById('sHp').textContent=`${u.hp}/${u.maxHp}`;
+  document.getElementById('sAp').textContent=`${u.ap}/${u.maxAp}`;
+  document.getElementById('sLv').textContent=u.level;
+  document.getElementById('sXp').textContent=`${u.xp}/${u.level*50}`;
+  document.getElementById('sWpn').textContent=`${u.weapon.name} (D${u.weapon.damage} R${u.weapon.range})`;
+  document.getElementById('sAmmo').textContent=`${u.weapon.ammo}/${u.weapon.maxAmmo}`;
+  document.getElementById('sAim').textContent=`+${Math.round((u.aimBonus||0)*100)}%`;
+  document.getElementById('sMove').textContent=`${u.moveCost||2} AP/cél`;
+  document.getElementById('sPerks').textContent=(u.perks&&u.perks.length)?u.perks.join(', '):'Nenhum';
+}
+const PERK_DEFS=[
+  {id:'aim',name:'Mira estável',desc:'+15% precisão',cost:30},
+  {id:'speed',name:'Pernas rápidas',desc:'-1 AP por célula',cost:25},
+  {id:'tank',name:'Tanque',desc:'+25 HP máx',cost:35},
+  {id:'fastReload',name:'Recarga rápida',desc:'-1 AP recarga',cost:20},
+  {id:'grenadier',name:'Granadeiro',desc:'+10 dano granada',cost:30},
+  {id:'regen',name:'Sobrevivente',desc:'+5 HP/turno',cost:40},
+];
+function renderPerks(u){
+  if(!u) return;
+  const list=document.getElementById('perkList');
+  const panel=document.getElementById('perks');
+  if(panel.style.display==='none') return;
+  document.getElementById('xpDisplay').textContent=`${u.xp} XP (Lv${u.level})`;
+  list.innerHTML='';
+  for(const pd of PERK_DEFS){
+    const has=u.perks&&u.perks.includes(pd.id);
+    const div=document.createElement('div'); div.className='perk-item'+(has?' active':'');
+    div.innerHTML=`<span>${pd.name}</span>`;
+    if(!has){
+      const btn=document.createElement('button'); btn.className='perk-btn'; btn.textContent=`${pd.cost} XP`;
+      btn.disabled=u.xp<pd.cost || u.team!==myTeam;
+      btn.onclick=()=>{send({type:'action',action:'buyPerk',unitId:u.id,perkId:pd.id});};
+      div.appendChild(btn);
+    } else {div.innerHTML+=`<span style="color:#4ade80">✓</span>`}
+    list.appendChild(div);
+  }
+}
+
+// === RENDER ===
+const canvas=document.getElementById('canvas');
+const ctx=canvas.getContext('2d');
+const CELL=32, COLS=20, ROWS=15;
+
+function draw(){
+  shakeX*=0.82; shakeY*=0.82;
+  if(Math.abs(shakeX)<0.5) shakeX=0; if(Math.abs(shakeY)<0.5) shakeY=0;
+  ctx.save(); ctx.translate(shakeX,shakeY);
+  ctx.fillStyle='#0f3460'; ctx.fillRect(-10,-10,canvas.width+20,canvas.height+20);
+  if(!gameState){ctx.restore(); requestAnimationFrame(draw); return;}
+
+  ctx.strokeStyle='#1a4a7a'; ctx.lineWidth=.5;
+  for(let x=0;x<=COLS;x++){ctx.beginPath();ctx.moveTo(x*CELL,0);ctx.lineTo(x*CELL,ROWS*CELL);ctx.stroke();}
+  for(let y=0;y<=ROWS;y++){ctx.beginPath();ctx.moveTo(0,y*CELL);ctx.lineTo(COLS*CELL,y*CELL);ctx.stroke();}
+
+  ctx.fillStyle='#4a5568';
+  for(const o of gameState.obstacles) ctx.fillRect(o.x*CELL+2,o.y*CELL+2,CELL-4,CELL-4);
+  for(const o of gameState.obstacles){
+    for(const u of gameState.units){if(u.dead)continue; if(Math.abs(o.x-u.x)+Math.abs(o.y-u.y)===1){ctx.fillStyle='rgba(96,165,250,0.12)';ctx.fillRect(u.x*CELL,u.y*CELL,CELL,CELL);}}
+  }
+  for(const c of gameState.crates){
+    if(c.taken)continue;
+    const cx=c.x*CELL+CELL/2, cy=c.y*CELL+CELL/2;
+    ctx.fillStyle=c.type==='ammo'?'#fbbf24':c.type==='medkit'?'#4ade80':'#60a5fa';
+    ctx.beginPath();ctx.moveTo(cx,cy-10);ctx.lineTo(cx+10,cy);ctx.lineTo(cx,cy+10);ctx.lineTo(cx-10,cy);ctx.closePath();ctx.fill();
+    ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();
+    ctx.fillStyle='#fff';ctx.font='bold 10px sans-serif';ctx.textAlign='center';ctx.fillText(c.type==='ammo'?'A':c.type==='medkit'?'+':'⚡',cx,cy+3);
+  }
+
+  const su = selectedUnit ? findUnit(selectedUnit) : null;
+  if(su && su.team===gameState.activeTeam && !su.dead && gameState.activeTeam===myTeam){
+    if(mode==='grenade'){
+      ctx.fillStyle='rgba(251,191,36,0.15)';
+      for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){const nx=su.x+dx,ny=su.y+dy;if(nx>=0&&nx<COLS&&ny>=0&&ny<ROWS&&Math.abs(dx)+Math.abs(dy)<=8)ctx.fillRect(nx*CELL,ny*CELL,CELL,CELL);}
+    } else {
+      const md=Math.floor(su.ap/(su.moveCost||2));
+      ctx.fillStyle='rgba(96,165,250,0.12)';
+      for(let dy=-md;dy<=md;dy++)for(let dx=-md;dx<=md;dx++){const nx=su.x+dx,ny=su.y+dy;if(nx>=0&&nx<COLS&&ny>=0&&ny<ROWS&&Math.abs(dx)+Math.abs(dy)<=md&&!gameState.units.some(u=>u.x===nx&&u.y===ny&&!u.dead)&&!gameState.obstacles.some(o=>o.x===nx&&o.y===ny))ctx.fillRect(nx*CELL,ny*CELL,CELL,CELL);}
+      ctx.fillStyle='rgba(248,113,113,0.10)';
+      const rg=su.weapon.range;
+      for(let dy=-rg;dy<=rg;dy++)for(let dx=-rg;dx<=rg;dx++){const nx=su.x+dx,ny=su.y+dy;if(nx>=0&&nx<COLS&&ny>=0&&ny<ROWS&&Math.abs(dx)+Math.abs(dy)<=rg){const t=gameState.units.find(u=>u.x===nx&&u.y===ny&&!u.dead);if(t&&t.team!==su.team){ctx.fillRect(nx*CELL,ny*CELL,CELL,CELL);}}}
+    }
+  }
+  if(hoverCell){ctx.strokeStyle='#e0e0e0';ctx.lineWidth=2;ctx.strokeRect(hoverCell.x*CELL+1,hoverCell.y*CELL+1,CELL-2,CELL-2);}
+  if(su&&!su.dead){ctx.strokeStyle='#fbbf24';ctx.lineWidth=2;ctx.strokeRect(su.x*CELL+1,su.y*CELL+1,CELL-2,CELL-2);}
+
+  for(let i=projectiles.length-1;i>=0;i--){
+    const p=projectiles[i]; const dx=p.tx-p.x, dy=p.ty-p.y, d=Math.sqrt(dx*dx+dy*dy);
+    if(d<p.speed){projectiles.splice(i,1);continue;}
+    const nx=p.x+(dx/d)*p.speed, ny=p.y+(dy/d)*p.speed;
+    ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(nx,ny);ctx.strokeStyle='#fbbf24';ctx.lineWidth=3;ctx.stroke();
+    ctx.beginPath();ctx.arc(nx,ny,3,0,Math.PI*2);ctx.fillStyle='#fbbf24';ctx.fill();p.x=nx;p.y=ny;
+  }
+
+  for(const u of gameState.units){
+    if(u.dead)continue;
+    const cx=u._vx||u.x*CELL+CELL/2, cy=u._vy||u.y*CELL+CELL/2;
+    ctx.beginPath();ctx.arc(cx,cy,11,0,Math.PI*2);ctx.fillStyle=u.team===0?'#3b82f6':'#ef4444';ctx.fill();
+    ctx.strokeStyle=u.team===gameState.activeTeam?'#fbbf24':'#fff';ctx.lineWidth=u.team===gameState.activeTeam?2.5:1.5;ctx.stroke();
+    if(u.overwatch){ctx.fillStyle='#fbbf24';ctx.font='bold 8px sans-serif';ctx.textAlign='center';ctx.fillText('OW',cx,cy-16);}
+    ctx.fillStyle='#1a1a2e';ctx.fillRect(cx-12,cy-18,24,4);
+    ctx.fillStyle=u.hp>50?'#4ade80':u.hp>25?'#fbbf24':'#f87171';ctx.fillRect(cx-12,cy-18,24*(u.hp/u.maxHp),4);
+    ctx.fillStyle='#fff';ctx.font='bold 9px sans-serif';ctx.textAlign='center';ctx.fillText(u.ap,cx,cy+3);
+    ctx.font='10px sans-serif';ctx.fillStyle='rgba(255,255,255,0.8)';ctx.fillText(u.weapon.name[0],cx,cy+14);
+    if(u.weapon.ammo<=1){ctx.fillStyle='#f87171';ctx.font='bold 8px sans-serif';ctx.fillText('!',cx+14,cy-10);}
+    ctx.fillStyle='rgba(255,255,255,0.7)';ctx.font='bold 7px sans-serif';ctx.fillText(`Lv${u.level}`,cx-14,cy-10);
+  }
+
+  if(su&&hoverCell){const t=gameState.units.find(u=>u.x===hoverCell.x&&u.y===hoverCell.y&&!u.dead);if(t&&t.team!==su.team){ctx.beginPath();ctx.moveTo((su._vx||su.x*CELL+CELL/2),(su._vy||su.y*CELL+CELL/2));ctx.lineTo(t.x*CELL+CELL/2,t.y*CELL+CELL/2);ctx.strokeStyle='#f87171';ctx.setLineDash([4,4]);ctx.lineWidth=1.5;ctx.stroke();ctx.setLineDash([]);}}
+
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];p.x+=p.vx;p.y+=p.vy;p.vy+=.15;p.life-=.035;
+    ctx.globalAlpha=Math.max(0,p.life);ctx.fillStyle=p.color;ctx.fillRect(p.x-2,p.y-2,4,4);ctx.globalAlpha=1;
+    if(p.life<=0)particles.splice(i,1);
+  }
+  for(let i=floatTexts.length-1;i>=0;i--){
+    const f=floatTexts[i];f.y+=f.vy;f.life-=.018;
+    ctx.globalAlpha=Math.max(0,f.life);ctx.fillStyle=f.color;ctx.font='bold 14px sans-serif';ctx.textAlign='center';ctx.fillText(f.text,f.x,f.y);ctx.globalAlpha=1;
+    if(f.life<=0)floatTexts.splice(i,1);
+  }
+
+  // Minimap
+  const mmW=80,mmH=60,mmX=canvas.width-mmW-8,mmY=canvas.height-mmH-8,mmCellW=mmW/COLS,mmCellH=mmH/ROWS;
+  ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(mmX-2,mmY-2,mmW+4,mmH+4);ctx.fillStyle='rgba(255,255,255,0.08)';
+  for(let x=0;x<COLS;x++)for(let y=0;y<ROWS;y++)ctx.fillRect(mmX+x*mmCellW,mmY+y*mmCellH,mmCellW,mmCellH);
+  for(const o of gameState.obstacles){ctx.fillStyle='#4a5568';ctx.fillRect(mmX+o.x*mmCellW,mmY+o.y*mmCellH,mmCellW,mmCellH);}
+  for(const c of gameState.crates){if(!c.taken){ctx.fillStyle=c.type==='ammo'?'#fbbf24':c.type==='medkit'?'#4ade80':'#60a5fa';ctx.fillRect(mmX+c.x*mmCellW,mmY+c.y*mmCellH,mmCellW,mmCellH);}}
+  for(const u of gameState.units){if(u.dead)continue;ctx.fillStyle=u.team===0?'#3b82f6':'#ef4444';ctx.beginPath();ctx.arc(mmX+u.x*mmCellW+mmCellW/2,mmY+u.y*mmCellH+mmCellH/2,2.5,0,Math.PI*2);ctx.fill();}
+  ctx.restore(); requestAnimationFrame(draw);
+}
+
+// === INPUTS ===
+canvas.addEventListener('mousemove',e=>{
+  const r=canvas.getBoundingClientRect();
+  const x=Math.floor((e.clientX-r.left)/CELL), y=Math.floor((e.clientY-r.top)/CELL);
+  if(x>=0&&x<COLS&&y>=0&&y<ROWS) hoverCell={x,y};
+});
+canvas.addEventListener('mouseleave',()=>hoverCell=null);
+canvas.addEventListener('click',e=>{
+  if(!gameState||gameState.activeTeam!==myTeam||animating) return;
+  const r=canvas.getBoundingClientRect();
+  const x=Math.floor((e.clientX-r.left)/CELL), y=Math.floor((e.clientY-r.top)/CELL);
+  if(x<0||x>=COLS||y<0||y>=ROWS) return;
+  const c=gameState.units.find(u=>u.x===x&&u.y===y&&!u.dead);
+  const su = selectedUnit ? findUnit(selectedUnit) : null;
+
+  if(mode==='grenade'){
+    if(su&&su.team===myTeam&&!su.dead&&Math.abs(su.x-x)+Math.abs(su.y-y)<=8){
+      send({type:'action',action:'grenade',unitId:su.id,x,y});
+    }
+    mode='normal'; updateUI(); return;
+  }
+  if(mode==='overwatch'){
+    if(c&&c.team===myTeam&&!c.dead){send({type:'action',action:'overwatch',unitId:c.id});}
+    mode='normal'; updateUI(); return;
+  }
+  if(su&&su.team===myTeam&&!su.dead){
+    if(c&&c.team!==myTeam&&!c.dead){
+      const d=Math.abs(su.x-c.x)+Math.abs(su.y-c.y);
+      if(d<=su.weapon.range&&su.ap>=su.weapon.apCost){send({type:'action',action:'attack',unitId:su.id,targetId:c.id}); return;}
+    }
+    const cost=Math.abs(su.x-x)+Math.abs(su.y-y)*(su.moveCost||2);
+    if(su.ap>=cost&&!c&&!gameState.obstacles.some(o=>o.x===x&&o.y===y)){
+      send({type:'action',action:'move',unitId:su.id,x,y}); return;
+    }
+  }
+  if(c&&c.team===myTeam&&!c.dead){selectedUnit=c.id; updateUI();}
+});
+
+document.getElementById('btnCreate').addEventListener('click',()=>send({type:'create'}));
+document.getElementById('btnJoin').addEventListener('click',()=>{
+  const code=document.getElementById('inputCode').value.trim();
+  if(code.length===4) send({type:'join',code});
+  else alert('Digite um código de 4 dígitos');
+});
+document.getElementById('btnEndTurn').addEventListener('click',()=>send({type:'action',action:'endTurn'}));
+document.getElementById('btnOverwatch').addEventListener('click',()=>{if(!selectedUnit) return; mode='overwatch'; updateUI();});
+document.getElementById('btnGrenade').addEventListener('click',()=>{if(!selectedUnit) return; mode='grenade'; updateUI();});
+document.getElementById('btnReload').addEventListener('click',()=>{if(selectedUnit) send({type:'action',action:'reload',unitId:selectedUnit});});
+document.getElementById('btnPerks').addEventListener('click',()=>{
+  const p=document.getElementById('perks'); p.style.display=p.style.display==='block'?'none':'block'; updateUI();
+});
+document.addEventListener('keydown',e=>{
+  if(!gameState||gameState.activeTeam!==myTeam) return;
+  if(e.key==='Enter'||e.key===' '){e.preventDefault(); send({type:'action',action:'endTurn'});}
+  if(e.key==='o'||e.key==='O'){if(!selectedUnit) return; mode='overwatch'; updateUI();}
+  if(e.key==='g'||e.key==='G'){if(!selectedUnit) return; mode='grenade'; updateUI();}
+  if(e.key==='l'||e.key==='L'){if(selectedUnit) send({type:'action',action:'reload',unitId:selectedUnit});}
+  if(e.key==='p'||e.key==='P'){document.getElementById('btnPerks').click();}
+});
+
+connect();
+draw();
+</script>
+</body>
+</html>
